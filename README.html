@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>魔方计时器 · 二阶/三阶 · Cube Timer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0b0b12;--surface:#13131f;--card:rgba(8,8,40,0.55);--border:rgba(0,212,255,0.10);
+    --text:#d0d8f0;--muted:#6b7394;--accent:#00d4ff;--green:#00e5a0;
+    --red:#ff4470;--amber:#ffb347;--radius:14px;--gap:12px;
+  }
+  html,body{width:100%;height:100%;overflow-x:hidden;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;overscroll-behavior:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;font-feature-settings:"cv02","cv03","cv04","cv11"}
+  body{
+    background:#020010;color:var(--text);display:flex;flex-direction:column;
+    align-items:center;user-select:none;-webkit-user-select:none;min-height:100vh;
+    padding:16px;gap:var(--gap);
+  }
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+  #top-bar{
+    width:100%;max-width:800px;display:flex;align-items:center;
+    justify-content:center;gap:8px;flex-wrap:wrap;
+  }
+  #scramble-text{
+    font-family:"JetBrains Mono","SF Mono","Consolas",monospace;
+    font-size:16px;line-height:1.8;color:#c0c8e0;
+    width:100%;max-width:800px;
+    background:rgba(255,255,255,0.03);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius);
+    padding:16px 20px;white-space:normal;word-break:break-all;text-align:center;transition:border-color .3s,box-shadow .3s;
+  }
+  #scramble-text:hover{border-color:rgba(255,255,255,0.1);box-shadow:0 0 30px rgba(0,200,255,0.04)}
+  .pill-btn{
+    padding:8px 16px;border:1px solid rgba(255,255,255,0.05);border-radius:24px;
+    background:rgba(255,255,255,0.03);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    color:var(--muted);font-size:12px;font-weight:500;letter-spacing:0.2px;
+    cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);white-space:nowrap;
+  }
+  .pill-btn:hover{background:rgba(255,255,255,0.06);color:var(--text);border-color:rgba(255,255,255,0.12);transform:translateY(-1px)}
+  .pill-btn.accent{box-shadow:0 4px 20px rgba(0,198,255,0.25);background:var(--accent);color:#0a0a1a;border-color:var(--accent);font-weight:600;box-shadow:0 4px 20px rgba(0,198,255,0.25)}
+  #mode-toggle{
+    padding:8px 18px;border-radius:24px;border:none;
+    background:linear-gradient(135deg,var(--green),#00c896);color:#0a0a1a;font-size:12px;font-weight:600;
+    cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);white-space:nowrap;
+  }
+  #mode-toggle.normal{background:#3b82f6;color:#fff;border:none}
+  #mode-toggle:hover{opacity:.85}
+  #cube-type-btn{
+    padding:8px 18px;border-radius:24px;border:none;
+    background:linear-gradient(135deg,var(--amber),#ff8c2a);color:#0a0a1a;font-size:12px;font-weight:600;
+    cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);white-space:nowrap;
+  }
+  #cube-type-btn:hover{opacity:.85}
+  #cube-type-btn.c2{background:linear-gradient(135deg,var(--accent),#0090ff);color:#0a0a1a}
+  #cube-type-btn.c3{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff}
+  #ready-ms{
+    width:50px;background:rgba(8,8,40,0.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.06);
+    border-radius:8px;color:var(--text);padding:4px 6px;font-size:12px;text-align:center;
+  }
+
+  #main-layout{
+    width:100%;max-width:820px;display:flex;gap:14px;align-items:flex-start;justify-content:center;
+    
+  }
+  #cube-wrap{
+    width:280px;height:280px;flex-shrink:0;
+    background:rgba(8,8,40,0.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius);
+    overflow:hidden;position:relative;
+  }
+  #cube-wrap canvas{display:block;margin:0 auto}
+  #cube-wrap{transition:box-shadow .25s}
+
+  #timer-card{
+    flex:1;min-width:200px;display:flex;flex-direction:column;
+    align-items:center;gap:12px;
+    background:rgba(255,255,255,0.02);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius);
+    padding:28px 24px 24px;transition:border-color .3s;
+  }
+  #timer-card:hover{border-color:rgba(255,255,255,0.1)}
+  #timer{
+    font-family:"JetBrains Mono","SF Mono","Consolas",monospace;
+    font-size:68px;font-weight:600;color:#fff;letter-spacing:2px;
+    line-height:1;transition:color .3s;font-variant-numeric:tabular-nums;
+  }
+  #timer.ready{color:var(--green)}
+  #timer.running{color:#fff}
+  #timer-state{font-size:13px;color:var(--muted);min-height:18px}
+
+  #stats-row{
+    display:flex;gap:16px;flex-wrap:wrap;justify-content:center;
+    width:100%;max-width:800px;
+  }
+  .stat-card{
+    flex:1;min-width:70px;text-align:center;
+    background:rgba(255,255,255,0.02);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,0.05);border-radius:var(--radius);
+    padding:12px 8px;transition:transform .25s,box-shadow .25s;
+  }
+  .stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,0.3)}
+  .stat-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+  .stat-card .val{font-family:"JetBrains Mono",monospace;font-size:18px;color:var(--text);font-weight:600}
+
+  #times-wrap{
+    width:100%;max-width:800px;max-height:240px;overflow-y:auto;
+    background:rgba(255,255,255,0.02);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,0.05);border-radius:var(--radius);
+    padding:4px 8px;scroll-behavior:smooth;
+  }
+  #times-table{width:100%;border-collapse:collapse;font-size:13px}
+  #times-table th{color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:8px 10px;text-align:left;position:sticky;top:0;z-index:2;background:#0a0a20}
+  #times-table td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.03);transition:background .15s}
+  #times-table tr:hover td{background:rgba(255,255,255,0.02)}#times-table tr:last-child td{border-bottom:none}
+  .t-idx{color:#444;width:34px;text-align:right;font-size:11px}
+  .t-time{font-family:"JetBrains Mono",monospace;color:var(--text)}
+  .t-time.dnf{color:var(--red);text-decoration:line-through}
+  .t-time.plus2{color:var(--amber)}
+  .act-btn{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:500;transition:all .2s;
+    padding:2px 8px;border:1px solid transparent;border-radius:5px;
+    background:rgba(12,12,50,0.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--muted);font-size:10px;cursor:pointer;
+    transition:all .15s;
+  }
+  .act-btn:hover{border-color:var(--border);color:var(--text)}
+  .act-btn.act-active{background:var(--border);color:#fff}
+  #btn-reset{
+    padding:8px 20px;border:1px solid rgba(255,255,255,0.06);border-radius:20px;
+    background:rgba(12,12,50,0.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--muted);font-size:12px;cursor:pointer;
+    transition:all .2s;
+  }
+  #btn-reset:hover{border-color:var(--red);color:var(--red)}
+
+  .t-time{cursor:pointer}.t-time:hover{color:#fff}
+  .scramble-pop{display:none;font-size:11px;color:var(--muted);padding:2px 8px 6px 38px;word-break:break-all}
+  .scramble-pop.show{display:table-row}
+
+  #main-layout{flex-direction:row;align-items:center;justify-content:space-between;gap:40px;width:100%;max-width:600px}
+  .virtual-layout #cube-wrap{width:380px;height:380px;flex-shrink:0;position:relative;margin:0 auto}
+  .virtual-timer{min-width:100px;max-width:100px;padding:8px;text-align:center;flex-shrink:0}
+  .virtual-timer #timer{font-size:26px;letter-spacing:0}
+  .virtual-timer #timer-state{font-size:10px;min-height:14px}
+  #left-col{display:none}
+
+  @media(min-width:768px){
+    #main-layout{flex-direction:row}
+  }
+  #drag-handle{position:absolute;top:4px;right:4px;width:22px;height:22px;color:rgba(255,255,255,0.5);font-size:14px;line-height:22px;text-align:center;cursor:grab;border-radius:4px;box-shadow:0 0 8px rgba(124,111,240,0.6);display:none;z-index:10;user-select:none}
+.virtual-layout #drag-handle{display:block}
+#resize-handle{position:absolute;bottom:2px;right:2px;width:18px;height:18px;color:rgba(255,255,255,0.4);font-size:16px;line-height:18px;text-align:center;cursor:nwse-resize;display:none;z-index:10;user-select:none}
+.virtual-layout #resize-handle{display:block}
+
+  @media(max-width:640px){
+    body{padding:env(safe-area-inset-top,10px) max(env(safe-area-inset-right,10px),10px) env(safe-area-inset-bottom,10px) max(env(safe-area-inset-left,10px),10px);gap:8px}
+    #top-bar{justify-content:center;gap:6px}
+    #scramble-text{flex:1 1 100%;min-width:100%;font-size:13px;padding:8px 10px}
+    #main-layout{flex-direction:column!important;align-items:center;max-width:100%;gap:10px}
+    #cube-wrap{width:100px;height:100px}
+    #timer{font-size:44px}
+    #timer-card{width:100%;padding:16px 12px}
+    #times-wrap{max-height:150px}
+    #stats-row{gap:6px}
+    .stat-card{padding:8px 4px;min-width:calc(33.33% - 6px)}
+    .stat-card .val{font-size:15px}
+    .pill-btn{font-size:11px;padding:6px 12px}
+    #mode-toggle{font-size:11px;padding:6px 14px}
+    .act-btn{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:500;transition:all .2s;padding:5px 10px;font-size:11px;border-radius:6px}
+    #btn-reset{padding:10px 24px;font-size:13px}
+    #times-table{font-size:12px}
+    #times-table td,#times-table th{padding:6px 4px}
+    #drag-handle{width:32px;height:32px;font-size:18px;line-height:32px;top:2px;right:2px}
+    #resize-handle{width:28px;height:28px;font-size:22px;line-height:28px;bottom:1px;right:1px}
+    .virtual-layout{flex-direction:column!important;align-items:center!important;gap:10px!important}
+    .virtual-layout #cube-wrap{width:min(90vw,380px)!important;height:min(90vw,380px)!important;position:relative!important;margin:0 auto!important}
+    .virtual-timer{width:auto!important;max-width:120px!important;min-width:unset!important;padding:10px 12px!important}
+    .virtual-timer #timer{font-size:28px}
+    #anim-scramble{display:none}
+  }
+  @media(max-width:480px){
+    body{padding:6px;gap:6px}
+    #scramble-text{font-size:12px;line-height:1.5;padding:6px 8px}
+    #timer{font-size:36px;letter-spacing:1px}
+    #timer-card{padding:12px 8px;gap:8px}
+    #timer-state{font-size:11px}
+    #times-wrap{max-height:120px;padding:6px 8px}
+    #times-table{font-size:11px}
+    #times-table td,#times-table th{padding:4px 3px}
+    .stat-card{padding:6px 3px;min-width:calc(33.33% - 4px)}
+    .stat-card .val{font-size:13px}
+    .stat-card .lbl{font-size:10px}
+    .pill-btn{font-size:10px;padding:5px 10px}
+    #mode-toggle{font-size:10px;padding:5px 12px}
+    .virtual-layout #cube-wrap{width:min(95vw,320px)!important;height:min(95vw,320px)!important;position:relative!important;margin:0 auto!important}
+    .virtual-timer #timer{font-size:24px}
+    #drag-handle{width:28px;height:28px;font-size:16px;line-height:28px}
+    #resize-handle{width:24px;height:24px;font-size:20px;line-height:24px}
+  }
+
+  #splash{
+    position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    background:#0b0b12;opacity:1;transition:opacity .6s ease-out;
+  }
+  #splash.hide{opacity:0;pointer-events:none}
+  #splash-text{
+    font-family:"JetBrains Mono","SF Mono","Consolas",monospace;
+    font-size:clamp(28px,6vw,48px);font-weight:700;color:#fff;letter-spacing:2px;
+    animation:splashIn .6s ease-out forwards;
+  }
+  @keyframes splashIn{
+    0%{opacity:0;transform:scale(0.8);filter:blur(8px)}
+    100%{opacity:1;transform:scale(1);filter:blur(0)}
+  }
+  #splash-sub{
+    position:absolute;bottom:24vh;font-size:12px;color:var(--muted);letter-spacing:3px;
+    animation:splashIn .5s ease-out .15s forwards;opacity:0;
+  }
+
+
+  /* ——— Space background ——— */
+  #stars-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(ellipse at 20% 50%,rgba(72,49,212,0.12) 0%,transparent 50%),
+      radial-gradient(ellipse at 80% 20%,rgba(0,180,216,0.08) 0%,transparent 50%),
+      radial-gradient(ellipse at 60% 80%,rgba(120,40,200,0.1) 0%,transparent 50%);
+  }
+  body>*{position:relative;z-index:1}
+
+
+  #scramble-text{
+    
+  }
+  #cube-wrap{
+    box-shadow:0 8px 32px rgba(0,0,0,0.35);
+  }
+  #timer-card{
+    
+  }
+  #times-wrap{
+    box-shadow:0 4px 20px rgba(0,0,0,0.3);
+  }
+  .stat-card{
+    box-shadow:0 4px 16px rgba(0,0,0,0.3);
+  }
+  .pill-btn{
+    
+  }
+  .pill-btn.accent{box-shadow:0 4px 20px rgba(0,198,255,0.25);
+    box-shadow:0 0 16px rgba(0,212,255,0.25);
+  }
+  #timer{
+    text-shadow:0 0 30px rgba(0,212,255,0.3);
+  }
+  #timer.ready{color:#00e5a0;text-shadow:0 0 24px rgba(0,229,160,0.4)}
+  #splash{
+    background:radial-gradient(ellipse at center,#0d0d30 0%,#020010 70%);
+  }
+</style>
+</head>
+<body>
+<canvas id="stars-canvas"></canvas>
+<div id="splash">
+  <div id="splash-text">cjq's timer</div>
+  <div id="splash-sub">CUBE · 2x2 &amp; 3x3</div>
+</div>
+
+
+<div id="top-bar">
+  <button id="next-scramble" class="pill-btn">下一组打乱</button>
+  <button id="btn-solved" class="pill-btn">显示还原</button>
+  <button id="cube-type-btn" class="c2">二阶</button>
+  <button id="mode-toggle">虚拟魔方</button>
+  <label id="ready-label" style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)">
+    准备<input id="ready-ms" type="number" value="350" min="0" max="2000" step="50">ms
+  </label>
+  <button id="hollow-btn" class="pill-btn accent">贴纸: 镂空</button>
+  <button id="anim-scramble" class="pill-btn">打乱动画: 关</button><label id="cube-size-label" style="display:none;align-items:center;gap:4px;font-size:11px;color:var(--muted)">魔方<input id="cube-size" type="range" min="200" max="500" value="380" step="20" style="width:60px;accent-color:var(--accent)"></label>  <button id="btn-fullscreen" class="pill-btn">[  ] 全屏</button>
+</div>
+
+<div id="scramble-text">R U R&apos; U&apos; R&apos; F R2 U&apos; R&apos; U&apos; R U R&apos; F&apos;</div>
+
+<div id="main-layout">
+<div id="timer-card">
+  <div id="timer">00:00.00</div>
+  <div id="timer-state">按住空格键 / 触摸屏幕 开始计时</div>
+</div>
+<div id="cube-wrap"></div>
+<div id="left-col">
+</div>
+</div>
+
+<div id="stats-row">
+  <div class="stat-card"><div class="lbl">ao5</div><div class="val" id="s-ao5">-</div></div>
+  <div class="stat-card"><div class="lbl">ao12</div><div class="val" id="s-ao12">-</div></div>
+  <div class="stat-card"><div class="lbl">最佳</div><div class="val" id="s-best">-</div></div>
+  <div class="stat-card"><div class="lbl">最差</div><div class="val" id="s-worst">-</div></div>
+  <div class="stat-card"><div class="lbl">均值</div><div class="val" id="s-mean">-</div></div>
+  <div class="stat-card"><div class="lbl">次数</div><div class="val" id="s-count">0</div></div>
+</div>
+
+<div id="times-wrap">
+  <table id="times-table">
+    <thead><tr><th>#</th><th>成绩</th><th></th></tr></thead>
+    <tbody id="times-body"></tbody>
+  </table>
+</div>
+
+<div style="display:flex;justify-content:center;padding:4px">
+  <button id="btn-reset">清空记录</button>
+</div>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+let virtualMode = !("ontouchstart" in window || navigator.maxTouchPoints > 0);
+let cubeOrder = 2;
+let hollowStickers = true;
+const originalPositions = [];
+
+const cubeWrap = document.getElementById("cube-wrap");
+const W = 300, H = 300;
+const pScene = new THREE.Scene();
+const pCamera = new THREE.PerspectiveCamera(35, W/H, 0.5, 30);
+pCamera.position.set(5, 5, 5);
+pCamera.lookAt(0, 0, 0);
+const pRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+pRenderer.setSize(W, H);
+pRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+cubeWrap.appendChild(pRenderer.domElement);
+pScene.add(new THREE.AmbientLight(0x404060, 2));
+const pKey = new THREE.DirectionalLight(0xffffff, 2.5); pKey.position.set(6, 10, 5); pScene.add(pKey);
+const pFill = new THREE.DirectionalLight(0x8899cc, 0.8); pFill.position.set(-3, 1, -3); pScene.add(pFill);
+
+const pDark = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.75, metalness: 0.05 });
+const pMatR = new THREE.MeshStandardMaterial({ color: 0xb71234, roughness: 0.25, metalness: 0.1 });
+const pMatL = new THREE.MeshStandardMaterial({ color: 0xff5800, roughness: 0.25, metalness: 0.1 });
+const pMatU = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.25, metalness: 0.1 });
+const pMatD = new THREE.MeshStandardMaterial({ color: 0xffd500, roughness: 0.25, metalness: 0.1 });
+const pMatF = new THREE.MeshStandardMaterial({ color: 0x009b48, roughness: 0.25, metalness: 0.1 });
+const pMatB = new THREE.MeshStandardMaterial({ color: 0x0046ad, roughness: 0.25, metalness: 0.1 });
+const pEdgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 });
+
+const pGroup = new THREE.Group(); pScene.add(pGroup);
+const SZ = 0.82, SP = 1.0;
+const previewCubies = [];
+
+const STKR = 0.33, STKRAD = 0.06;
+function makeStickerOutline() {
+  const s = new THREE.Shape();
+  const w = STKR, h = STKR, r = STKRAD;
+  s.moveTo(-w+r, -h); s.lineTo(w-r, -h);
+  s.quadraticCurveTo(w, -h, w, -h+r); s.lineTo(w, h-r);
+  s.quadraticCurveTo(w, h, w-r, h); s.lineTo(-w+r, h);
+  s.quadraticCurveTo(-w, h, -w, h-r); s.lineTo(-w, -h+r);
+  s.quadraticCurveTo(-w, -h, -w+r, -h);
+  const pts = s.getPoints(48);
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  return geo;
+}
+const stickerOutline = makeStickerOutline();
+const stickerGeo = new THREE.ShapeGeometry((()=>{const s=new THREE.Shape();const w=STKR,h=STKR,r=STKRAD;s.moveTo(-w+r,-h);s.lineTo(w-r,-h);s.quadraticCurveTo(w,-h,w,-h+r);s.lineTo(w,h-r);s.quadraticCurveTo(w,h,w-r,h);s.lineTo(-w+r,h);s.quadraticCurveTo(-w,h,-w,h-r);s.lineTo(-w,-h+r);s.quadraticCurveTo(-w,-h,-w+r,-h);return s;})(),16);
+
+const sMatR = new THREE.MeshStandardMaterial({ color:0xb71234, roughness:0.12, metalness:0.05 });
+const sMatL = new THREE.MeshStandardMaterial({ color:0xff5800, roughness:0.12, metalness:0.05 });
+const sMatU = new THREE.MeshStandardMaterial({ color:0xf5f5f5, roughness:0.12, metalness:0.05 });
+const sMatD = new THREE.MeshStandardMaterial({ color:0xffd500, roughness:0.12, metalness:0.05 });
+const sMatF = new THREE.MeshStandardMaterial({ color:0x009b48, roughness:0.12, metalness:0.05 });
+const sMatB = new THREE.MeshStandardMaterial({ color:0x0046ad, roughness:0.12, metalness:0.05 });
+const sDarkMat = new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.8, metalness:0.05 });
+
+const sLineMatR = new THREE.LineBasicMaterial({ color:0xb71234, linewidth:1 });
+const sLineMatL = new THREE.LineBasicMaterial({ color:0xff5800, linewidth:1 });
+const sLineMatU = new THREE.LineBasicMaterial({ color:0xf5f5f5, linewidth:1 });
+const sLineMatD = new THREE.LineBasicMaterial({ color:0xffd500, linewidth:1 });
+const sLineMatF = new THREE.LineBasicMaterial({ color:0x009b48, linewidth:1 });
+const sLineMatB = new THREE.LineBasicMaterial({ color:0x0046ad, linewidth:1 });
+const sLineDarkMat = new THREE.LineBasicMaterial({ color:0x222222, linewidth:1 });
+const sLineColorMap = { x1:sLineMatR, "x-1":sLineMatL, y1:sLineMatU, "y-1":sLineMatD, z1:sLineMatF, "z-1":sLineMatB };
+const sColorMap = { x1:sMatR, "x-1":sMatL, y1:sMatU, "y-1":sMatD, z1:sMatF, "z-1":sMatB };
+
+const FACE_CFG = [
+  ["x", 1,  "x", 1,  0, Math.PI/2],
+  ["x", -1, "x", -1, 0, -Math.PI/2],
+  ["y", 1,  "y", 1,  -Math.PI/2, 0],
+  ["y", -1, "y", -1, Math.PI/2, 0],
+  ["z", 1,  "z", 1,  0, 0],
+  ["z", -1, "z", -1, 0, Math.PI],
+];
+
+function addStickers(cubieMesh, gx, gy, gz) {
+  const colKey = { x:gx, y:gy, z:gz };
+  const offset = SZ/2 + 0.03;
+  FACE_CFG.forEach(cfg => {
+    const [axis, val, oAxis, oSign, rx, ry] = cfg;
+    const isExt = colKey[axis] === val;
+    const colorKey = isExt ? (axis + val) : "dark";
+    let sticker;
+    if (hollowStickers) {
+      const mat = isExt ? sLineColorMap[colorKey] : sLineDarkMat;
+      sticker = new THREE.LineLoop(stickerOutline, mat);
+    } else {
+      const mat = isExt ? sColorMap[colorKey] : sDarkMat;
+      sticker = new THREE.Mesh(stickerGeo, mat);
+    }
+    const pos = [0, 0, 0];
+    const oIdx = oAxis === "x" ? 0 : oAxis === "y" ? 1 : 2;
+    pos[oIdx] = offset * oSign;
+    sticker.position.set(pos[0], pos[1], pos[2]);
+    sticker.rotation.set(rx, ry, 0);
+    sticker.userData = { isSticker: true, colorKey: colorKey };
+    cubieMesh.add(sticker);
+  });
+}
+
+const bodyMat = new THREE.MeshStandardMaterial({ color:0x1a1a1a, roughness:0.7, metalness:0.05, transparent:true, opacity:1 });
+
+
+function buildPreviewCubies() {
+  while (pGroup.children.length) pGroup.remove(pGroup.children[0]);
+  previewCubies.length = 0;
+  if (cubeOrder === 2) {
+    const SP2 = 0.52;
+    for (let gx = -1; gx <= 1; gx += 2)
+      for (let gy = -1; gy <= 1; gy += 2)
+        for (let gz = -1; gz <= 1; gz += 2) {
+          const geo = new THREE.BoxGeometry(SZ, SZ, SZ);
+          const mesh = new THREE.Mesh(geo, bodyMat);
+          mesh.position.set(gx*SP2, gy*SP2, gz*SP2);
+          const el = new THREE.LineSegments(new THREE.EdgesGeometry(geo), pEdgeMat);
+          mesh.add(el);
+          addStickers(mesh, gx, gy, gz);
+          pGroup.add(mesh);
+          previewCubies.push(mesh);
+        }
+  } else {
+    for (let gx = -1; gx <= 1; gx++)
+      for (let gy = -1; gy <= 1; gy++)
+        for (let gz = -1; gz <= 1; gz++) {
+          if (gx === 0 && gy === 0 && gz === 0) continue;
+          const geo = new THREE.BoxGeometry(SZ, SZ, SZ);
+          const mesh = new THREE.Mesh(geo, bodyMat);
+          mesh.position.set(gx*SP, gy*SP, gz*SP);
+          const el = new THREE.LineSegments(new THREE.EdgesGeometry(geo), pEdgeMat);
+          mesh.add(el);
+          addStickers(mesh, gx, gy, gz);
+          pGroup.add(mesh);
+          previewCubies.push(mesh);
+        }
+  }
+}
+
+function saveOriginalState() {
+  originalPositions.length = 0;
+  previewCubies.forEach(c => originalPositions.push(c.position.clone()));
+}
+function isCubeSolved() {
+  const faces = { px:[], nx:[], py:[], ny:[], pz:[], nz:[] };
+  for (const c of previewCubies) {
+    for (const child of c.children) {
+      const isSticker = (child.isLine || child.isMesh) && child.userData && child.userData.colorKey && child.userData.colorKey !== "dark";
+      if (!isSticker) continue;
+      const wp = child.position.clone().applyQuaternion(c.quaternion).add(c.position);
+      const ax = Math.abs(wp.x), ay = Math.abs(wp.y), az = Math.abs(wp.z);
+      let key;
+      if (ax >= ay && ax >= az) key = wp.x > 0 ? "px" : "nx";
+      else if (ay >= ax && ay >= az) key = wp.y > 0 ? "py" : "ny";
+      else key = wp.z > 0 ? "pz" : "nz";
+      faces[key].push(child.userData.colorKey);
+    }
+  }
+  for (const k of Object.keys(faces)) {
+    const m = faces[k];
+    if (m.length !== cubeOrder*cubeOrder) return false;
+    if (!m.every(t => t === m[0])) return false;
+  }
+  return true;
+}
+function checkSolveAndStop() {
+  if (virtualMode && timerRunning && isCubeSolved()) {
+    stopTimer();
+    stateEl.textContent = "还原完成！即将开始下一把…";
+    cubeWrap.style.transition = "box-shadow .3s";
+    cubeWrap.style.boxShadow = "0 0 40px rgba(74,222,128,0.8)";
+    setTimeout(() => {
+      cubeWrap.style.boxShadow = "";
+      currentScramble = generateScramble();
+      scrambleText.textContent = currentScramble.join(" ");
+      applyScramble(currentScramble);
+      stateEl.textContent = "转动魔方开始计时，还原结束计时";
+    }, 1500);
+  }
+}
+
+buildPreviewCubies();
+if (virtualMode) saveOriginalState();
+
+const MOVE_DEFS_3 = {
+  "R":{axis:"x",sign:-1,val:1},"R'":{axis:"x",sign:1,val:1},
+  "L":{axis:"x",sign:1,val:-1},"L'":{axis:"x",sign:-1,val:-1},
+  "U":{axis:"y",sign:-1,val:1},"U'":{axis:"y",sign:1,val:1},
+  "D":{axis:"y",sign:1,val:-1},"D'":{axis:"y",sign:-1,val:-1},
+  "F":{axis:"z",sign:-1,val:1},"F'":{axis:"z",sign:1,val:1},
+  "B":{axis:"z",sign:1,val:-1},"B'":{axis:"z",sign:-1,val:-1},
+  "M":{axis:"x",sign:1,val:0},"M'":{axis:"x",sign:-1,val:0},
+  "E":{axis:"y",sign:1,val:0},"E'":{axis:"y",sign:-1,val:0},
+  "S":{axis:"z",sign:-1,val:0},"S'":{axis:"z",sign:1,val:0},
+  "Rw":{axis:"x",sign:-1,val:1,wide:true},"Rw'":{axis:"x",sign:1,val:1,wide:true},
+  "Lw":{axis:"x",sign:1,val:-1,wide:true},"Lw'":{axis:"x",sign:-1,val:-1,wide:true},
+  "Uw":{axis:"y",sign:-1,val:1,wide:true},"Uw'":{axis:"y",sign:1,val:1,wide:true},
+  "Dw":{axis:"y",sign:1,val:-1,wide:true},"Dw'":{axis:"y",sign:-1,val:-1,wide:true},
+  "x":{axis:"x",sign:1,all:true},"x'":{axis:"x",sign:-1,all:true},
+  "y":{axis:"y",sign:1,all:true},"y'":{axis:"y",sign:-1,all:true},
+  "z":{axis:"z",sign:1,all:true},"z'":{axis:"z",sign:-1,all:true},
+  "R2":{axis:"x",sign:-1,val:1,double:true},"L2":{axis:"x",sign:1,val:-1,double:true},
+  "U2":{axis:"y",sign:-1,val:1,double:true},"D2":{axis:"y",sign:1,val:-1,double:true},
+  "F2":{axis:"z",sign:-1,val:1,double:true},"B2":{axis:"z",sign:1,val:-1,double:true},
+  "x2":{axis:"x",sign:1,all:true,double:true},"y2":{axis:"y",sign:1,all:true,double:true},"z2":{axis:"z",sign:1,all:true,double:true},
+  "<":{axis:"x",sign:1,all:true},">":{axis:"x",sign:-1,all:true},
+};
+const MOVE_DEFS_2 = {
+  "R":{axis:"x",sign:-1,val:1},"R'":{axis:"x",sign:1,val:1},
+  "L":{axis:"x",sign:1,val:-1},"L'":{axis:"x",sign:-1,val:-1},
+  "U":{axis:"y",sign:-1,val:1},"U'":{axis:"y",sign:1,val:1},
+  "D":{axis:"y",sign:1,val:-1},"D'":{axis:"y",sign:-1,val:-1},
+  "F":{axis:"z",sign:-1,val:1},"F'":{axis:"z",sign:1,val:1},
+  "B":{axis:"z",sign:1,val:-1},"B'":{axis:"z",sign:-1,val:-1},
+  "x":{axis:"x",sign:1,all:true},"x'":{axis:"x",sign:-1,all:true},
+  "y":{axis:"y",sign:1,all:true},"y'":{axis:"y",sign:-1,all:true},
+  "z":{axis:"z",sign:1,all:true},"z'":{axis:"z",sign:-1,all:true},
+  "R2":{axis:"x",sign:-1,val:1,double:true},"L2":{axis:"x",sign:1,val:-1,double:true},
+  "U2":{axis:"y",sign:-1,val:1,double:true},"D2":{axis:"y",sign:1,val:-1,double:true},
+  "F2":{axis:"z",sign:-1,val:1,double:true},"B2":{axis:"z",sign:1,val:-1,double:true},
+  "x2":{axis:"x",sign:1,all:true,double:true},"y2":{axis:"y",sign:1,all:true,double:true},"z2":{axis:"z",sign:1,all:true,double:true},
+};
+function getMoveDefs() { return cubeOrder === 2 ? MOVE_DEFS_2 : MOVE_DEFS_3; }
+
+const VEC_MAP = { x: new THREE.Vector3(1,0,0), y: new THREE.Vector3(0,1,0), z: new THREE.Vector3(0,0,1) };
+
+function snapPos(obj) { const step=cubeOrder===2?0.52:1; obj.position.x=Math.round(obj.position.x/step)*step; obj.position.y=Math.round(obj.position.y/step)*step; obj.position.z=Math.round(obj.position.z/step)*step; }
+function snapQuat(obj) {
+  const m = new THREE.Matrix4().makeRotationFromQuaternion(obj.quaternion);
+  for (let i=0;i<16;i++) m.elements[i]=Math.round(m.elements[i]);
+  obj.quaternion.setFromRotationMatrix(m);
+}
+
+function getFaceCubies(axis, val, wide, all) {
+  return previewCubies.filter(c => {
+    const wp = new THREE.Vector3(); c.getWorldPosition(wp); pGroup.worldToLocal(wp);
+    if (all) return true;
+    const cv = Math.round(wp[axis]);
+    if (wide) return val === 1 ? cv >= 0 : cv <= 0;
+    return cv === val;
+  });
+}
+
+function applyMoveInstant(moveName) {
+  const def = getMoveDefs()[moveName]; if (!def) return;
+  const { axis, sign, val, wide, all, double } = def;
+  const angle = double ? Math.PI : Math.PI/2;
+  const quat = new THREE.Quaternion().setFromAxisAngle(VEC_MAP[axis], angle*sign);
+  getFaceCubies(axis, val, wide, all).forEach(c => {
+    c.position.applyQuaternion(quat); snapPos(c);
+    c.quaternion.premultiply(quat); snapQuat(c);
+  });
+}
+
+let pendingMoves = [], isAnimating = false;
+const ANIM_SPEED = 140;
+const MAX_QUEUE = 20;
+
+function queueMove(moveName) {
+  if (pendingMoves.length >= MAX_QUEUE) return;
+  pendingMoves.push(moveName);
+  if (!isAnimating) processNextMove();
+}
+
+function processNextMove() {
+  if (pendingMoves.length === 0) { isAnimating = false; return; }
+  isAnimating = true;
+  const moveName = pendingMoves.shift();
+  const def = getMoveDefs()[moveName];
+  if (!def) { processNextMove(); return; }
+  const { axis, sign, val, wide, all, double } = def;
+  const angle = double ? Math.PI : Math.PI/2;
+  const targetQuat = new THREE.Quaternion().setFromAxisAngle(VEC_MAP[axis], angle*sign);
+  const cubies = getFaceCubies(axis, val, wide, all);
+  const snapshots = cubies.map(c => ({cubie:c, startPos:c.position.clone(), startQuat:c.quaternion.clone()}));
+  const startTime = performance.now();
+  function animStep(ts) {
+    const t = Math.min((ts - startTime) / ANIM_SPEED, 1);
+    const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+    const partial = new THREE.Quaternion().setFromAxisAngle(VEC_MAP[axis], (Math.PI/2)*sign*ease);
+    snapshots.forEach(s => {
+      s.cubie.position.copy(s.startPos).applyQuaternion(partial);
+      s.cubie.quaternion.copy(s.startQuat).premultiply(partial);
+    });
+    if (t < 1) { requestAnimationFrame(animStep); } else {
+      snapshots.forEach(s => {
+        s.cubie.position.copy(s.startPos).applyQuaternion(targetQuat);
+        snapPos(s.cubie);
+        s.cubie.quaternion.copy(s.startQuat).premultiply(targetQuat);
+        snapQuat(s.cubie);
+      });
+      checkSolveAndStop();
+      processNextMove();
+    }
+  }
+  requestAnimationFrame(animStep);
+}
+
+let scrambleAnim = false;
+function applyScramble(moves) {
+  buildPreviewCubies();
+  if (scrambleAnim) {
+    let i = 0;
+    function next() { if (i < moves.length) { queueMove(moves[i]); i++; setTimeout(next, 180); } else { if (virtualMode) saveOriginalState(); } }
+    next();
+  } else {
+    moves.forEach(m => applyMoveInstant(m));
+    if (virtualMode) saveOriginalState();
+  }
+}
+
+const pControls = new OrbitControls(pCamera, pRenderer.domElement);
+pControls.target.set(0,0,0);
+pControls.enableDamping = true; pControls.dampingFactor = 0.08;
+pControls.minDistance = 1; pControls.maxDistance = 20; pControls.enablePan = true;
+pControls.autoRotate = false; pControls.enabled = false;
+
+const FACES_ALL = ["R","L","U","D","F","B"], VARIANTS = ["","'","2"];
+function getFaces() { return cubeOrder === 2 ? ["R","L","U","D","F","B"] : FACES_ALL; }
+function generateScramble(len) { if (len === void 0) len = cubeOrder === 2 ? 11 : 20;
+  const moves = []; let last = "";
+  for (let i = 0; i < len; i++) {
+    let f; const faces = getFaces(); do { f = faces[Math.floor(Math.random()*faces.length)]; } while (f === last);
+    last = f; moves.push(f + VARIANTS[Math.floor(Math.random()*2)]);
+  }
+  return moves;
+}
+
+let currentScramble = generateScramble();
+const scrambleText = document.getElementById("scramble-text");
+scrambleText.textContent = currentScramble.join(" ");
+applyScramble(currentScramble);
+
+let showSolved = false;
+const btnSolved = document.getElementById("btn-solved");
+btnSolved.addEventListener("click", () => {
+  if (timerRunning) { timerRunning = false; timerEl.classList.remove("running"); }
+  showSolved = !showSolved;
+  if (showSolved) { btnSolved.textContent = "显示打乱"; buildPreviewCubies(); if (virtualMode) saveOriginalState(); }
+  else { btnSolved.textContent = "显示还原"; applyScramble(currentScramble); }
+  stateEl.textContent = virtualMode ? "转动魔方开始计时，还原结束计时" : "按住空格键 / 触摸屏幕 开始计时";
+});
+document.getElementById("next-scramble").addEventListener("click", () => {
+  if (timerRunning) { timerRunning = false; timerEl.classList.remove("running"); }
+  showSolved = false; btnSolved.textContent = "显示还原";
+  currentScramble = generateScramble();
+  scrambleText.textContent = currentScramble.join(" ");
+  applyScramble(currentScramble);
+  stateEl.textContent = virtualMode ? "转动魔方开始计时，还原结束计时" : "按住空格键 / 触摸屏幕 开始计时";
+});
+
+const timerEl = document.getElementById("timer"), stateEl = document.getElementById("timer-state");
+let timerRunning = false, timerStart = 0, readyTimer = null, keyDown = false;
+let READY_THRESHOLD = 350;
+const readyInput = document.getElementById("ready-ms");
+readyInput.addEventListener("input", () => { READY_THRESHOLD = Math.max(0, Math.min(2000, parseInt(readyInput.value) || 350)); });
+
+function fmtTime(ms) {
+  if (ms < 0) ms = 0;
+  const m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), cs = Math.floor((ms%1000)/10);
+  if (m > 0) return m + ":" + String(s).padStart(2,"0") + "." + String(cs).padStart(2,"0");
+  return s + "." + String(cs).padStart(2,"0");
+}
+
+function updateTimerLoop() { if (!timerRunning) return; timerEl.textContent = fmtTime(performance.now() - timerStart); requestAnimationFrame(updateTimerLoop); }
+function startReady() { if (timerRunning) return; timerEl.classList.add("ready"); stateEl.textContent = "准备中…"; readyTimer = performance.now(); }
+function cancelReady() { timerEl.classList.remove("ready"); stateEl.textContent = "按住空格键 / 触摸屏幕 开始计时"; readyTimer = null; }
+function checkReady() {
+  if (!readyTimer) return false;
+  if (performance.now() - readyTimer >= READY_THRESHOLD) { stateEl.textContent = "松开开始计时!"; return true; }
+  cancelReady(); return false;
+}
+
+function startTimer() {
+  if (timerRunning) return;
+  const held = performance.now() - readyTimer; readyTimer = null;
+  if (held < READY_THRESHOLD) { cancelReady(); return; }
+  timerEl.classList.remove("ready"); timerEl.classList.add("running");
+  timerRunning = true; timerStart = performance.now();
+  stateEl.textContent = "计时中… 再次按空格停止"; updateTimerLoop();
+}
+
+function forceStartTimer() {
+  if (timerRunning) return; cancelReady();
+  timerEl.classList.remove("ready"); timerEl.classList.add("running");
+  timerRunning = true; timerStart = performance.now();
+  stateEl.textContent = "计时中…"; updateTimerLoop();
+}
+
+function stopTimer() {
+  if (!timerRunning) return;
+  timerRunning = false; timerEl.classList.remove("running");
+  const elapsed = performance.now() - timerStart;
+  timerEl.textContent = fmtTime(elapsed);
+  stateEl.textContent = "完成! 按空格开始下一次";
+  addTime(elapsed);
+  currentScramble = generateScramble();
+  scrambleText.textContent = currentScramble.join(" ");
+  applyScramble(currentScramble);
+}
+
+const KEY_MAP_3 = {
+  "1":"S'","2":"E","3":"<","4":">","5":"M","6":"M","7":"<","8":">","9":"E'","0":"S",
+  "q":"z'","w":"B","e":"L'","r":"Lw'","t":"x","y":"x'","u":"Rw","i":"R","o":"B'","p":"z",
+  "a":"y'","s":"D","d":"L","f":"U'","g":"F'","h":"F","j":"U","k":"R'","l":"D'",";":"y",
+  "z":"Dw","x":"M'","c":"Uw'","v":"Lw","b":"x","n":"x","m":"Rw'",",":"Uw",".":"M'","/":"Dw'",
+  "!":"R2","@":"U2","#":"F2","`$":"L2","%":"D2","^":"B2",
+};
+
+const KEY_MAP_2 = {
+  "q":"z'","w":"B","e":"L'","r":"x","t":"x","y":"x'","u":"x'","i":"R","o":"B'","p":"z",
+  "a":"y'","s":"D","d":"L","f":"U'","g":"F'","h":"F","j":"U","k":"R'","l":"D'",";":"y",
+  "z":"y","x":"y'","c":"y'","v":"y","b":"x","n":"x","m":"x'",",":"y'",".":"y'","/":"y",
+  "1":"R2","2":"U2","3":"F2","4":"L2","5":"D2","6":"B2",
+};
+
+function getKeyMap() { return cubeOrder === 2 ? KEY_MAP_2 : KEY_MAP_3; }
+
+window.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+  const key = e.key.toLowerCase();
+  if (virtualMode && getKeyMap()[key]) {
+    e.preventDefault();
+    const m = getKeyMap()[key];
+    queueMove(m);
+    if (!timerRunning && !["x","x'","y","y'","z","z'","<",">"].includes(m)) { forceStartTimer(); saveOriginalState(); }
+    return;
+  }
+  if (e.key === " " || e.code === "Space") {
+    e.preventDefault();
+    if (timerRunning) { stopTimer(); return; }
+    if (READY_THRESHOLD === 0) { forceStartTimer(); return; }
+    if (!keyDown) { keyDown = true; startReady(); }
+  }
+});
+
+window.addEventListener("keyup", e => {
+  if (e.key === " " || e.code === "Space") {
+    e.preventDefault(); keyDown = false;
+    if (virtualMode || timerRunning || READY_THRESHOLD === 0) return;
+    if (readyTimer) startTimer();
+  }
+});
+
+const raycaster = new THREE.Raycaster();
+let touchStartX = 0, touchStartY = 0, touchCubieNormal = null, touchCubieGrid = null;
+let isSwipeGesture = false, touchActive = false;
+const SWIPE_THRESHOLD = 8;
+
+function getCubieHit(clientX, clientY) {
+  const rect = pRenderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(((clientX-rect.left)/rect.width)*2-1, -((clientY-rect.top)/rect.height)*2+1);
+  raycaster.setFromCamera(mouse, pCamera);
+  const hits = raycaster.intersectObjects(previewCubies, false);
+  return hits.length > 0 ? hits[0] : null;
+}
+
+function getFaceNormal(intersect) {
+  const n = intersect.face.normal.clone();
+  n.applyMatrix3(new THREE.Matrix3().getNormalMatrix(intersect.object.matrixWorld));
+  const abs = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)];
+  const i = abs.indexOf(Math.max(...abs));
+  const v = new THREE.Vector3(0,0,0); v.setComponent(i, Math.sign(n.getComponent(i)));
+  return v;
+}
+
+function cubieSwipeToMove(fn, g, dx, dy) {
+  const absDx = Math.abs(dx), absDy = Math.abs(dy);
+  if (absDx < 16 && absDy < 16) return null;
+  const isH = absDx > absDy * 1.2, isV = absDy > absDx * 1.2;
+  if (!isH && !isV) return null;
+  if (isH) {
+    if (fn.y === 1 || fn.y === -1) return fn.y === 1 ? (dx<0?"U":"U'") : (dx<0?"D'":"D");
+    if (fn.z === 1 || fn.z === -1) {
+      if (g.y === 1)  return dx<0 ? (fn.z===1?"U":"U'") : (fn.z===1?"U'":"U");
+      if (g.y === -1) return dx<0 ? (fn.z===1?"D'":"D") : (fn.z===1?"D":"D'");
+      if (g.y === 0)  return dx<0 ? (fn.z===1?"E":"E'") : (fn.z===1?"E'":"E");
+    }
+    if (fn.x === 1 || fn.x === -1) {
+      if (g.y === 1)  return dx<0 ? (fn.x===1?"U":"U'") : (fn.x===1?"U'":"U");
+      if (g.y === -1) return dx<0 ? (fn.x===1?"D'":"D") : (fn.x===1?"D":"D'");
+      if (g.y === 0)  return dx<0 ? (fn.x===1?"E":"E'") : (fn.x===1?"E'":"E");
+    }
+  } else {
+    if (fn.y === 1 || fn.y === -1) {
+      if (g.z === 1)  return dy<0 ? "F'" : "F";
+      if (g.z === -1) return dy<0 ? "F" : "F'";
+      if (g.z === 0)  return dy<0 ? "S" : "S'";
+    }
+    if (fn.z === 1 || fn.z === -1) {
+      if (g.x === 1)  return dy<0 ? (fn.z===1?"R'":"R") : (fn.z===1?"R":"R'");
+      if (g.x === -1) return dy<0 ? (fn.z===1?"R":"R'") : (fn.z===1?"R'":"R");
+      if (g.x === 0)  return dy<0 ? (fn.z===1?"M'":"M") : (fn.z===1?"M":"M'");
+    }
+    if (fn.x === 1 || fn.x === -1) {
+      if (g.z === 1)  return dy<0 ? "F" : "F'";
+      if (g.z === -1) return dy<0 ? "F'" : "F";
+      if (g.z === 0)  return dy<0 ? "S" : "S'";
+    }
+  }
+  return null;
+}
+
+function bgSwipeToMove(dx, dy) {
+  const absDx = Math.abs(dx), absDy = Math.abs(dy);
+  if (absDx < 16 && absDy < 16) return null;
+  const isH = absDx > absDy * 1.2;
+  if (isH) return dx < 0 ? "y" : "y'";
+  if (absDy > absDx * 1.2) return dy < 0 ? "x'" : "x";
+  return null;
+}
+
+function applyTouchMove(moveName) { queueMove(moveName); }
+
+document.addEventListener("pointerdown", e => {
+  if (!e.isPrimary) return;
+  if (e.target.id === "mode-toggle" || e.target.id === "btn-solved" || e.target.id === "next-scramble" || e.target.id === "ready-ms" || e.target.id === "cube-size" || e.target.id === "drag-handle" || e.target.id === "resize-handle") return;
+  e.preventDefault();
+  touchStartX = e.clientX; touchStartY = e.clientY;
+  isSwipeGesture = false;
+  const hit = getCubieHit(e.clientX, e.clientY);
+  if (!hit) { touchCubieNormal = null; touchCubieGrid = null; }
+  else if (virtualMode) { touchCubieNormal = getFaceNormal(hit); const wp = hit.object.position.clone(); touchCubieGrid = { x: Math.round(wp.x), y: Math.round(wp.y), z: Math.round(wp.z) }; }
+  else { touchCubieNormal = "body"; touchCubieGrid = null; pControls.enabled = false; }
+});
+
+document.addEventListener("pointermove", e => {
+  if (!e.isPrimary) return;
+  if (e.target.id === "drag-handle" || e.target.id === "resize-handle") return;
+  const dx = e.clientX - touchStartX, dy = e.clientY - touchStartY;
+  if (!isSwipeGesture && (Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD)) {
+    isSwipeGesture = true;
+    if (touchCubieNormal !== null || virtualMode) pControls.enabled = false;
+  }
+});
+
+document.addEventListener("pointerup", e => {
+  if (!e.isPrimary) return;
+  if (e.target.id === "drag-handle" || e.target.id === "resize-handle") return;
+  if (isSwipeGesture) {
+    if (!virtualMode) pControls.enabled = true;
+    e.stopPropagation();
+    const dx = e.clientX - touchStartX, dy = e.clientY - touchStartY;
+    if (touchCubieNormal === "body") { const m = bgSwipeToMove(dx, dy); if (m) queueMove(m); }
+    else if (touchCubieNormal) { const m = cubieSwipeToMove(touchCubieNormal, touchCubieGrid, dx, dy); if (m) { queueMove(m); if (!timerRunning) { forceStartTimer(); saveOriginalState(); } } }
+    else if (virtualMode) { const m = bgSwipeToMove(dx, dy); if (m) queueMove(m); }
+  }
+});
+
+document.getElementById("timer-card").addEventListener("pointerdown", e => {
+  e.preventDefault();
+  if (virtualMode || timerRunning) return;
+  if (keyDown) return;
+  if (READY_THRESHOLD === 0) { forceStartTimer(); }
+  else { touchActive = true; startReady(); }
+});
+
+window.addEventListener("pointerup", e => {
+  if (timerRunning) { if (!virtualMode) { stopTimer(); } touchActive = false; return; }
+  if (virtualMode) return;
+  if (READY_THRESHOLD === 0) { touchActive = false; return; }
+  if (!touchActive) return;
+  touchActive = false;
+  if (readyTimer && checkReady()) startTimer();
+});
+
+const times = [];
+function saveTimes() { try { localStorage.setItem("cube_times", JSON.stringify(times)); localStorage.setItem("cube_order", cubeOrder); } catch(e){} }
+function loadTimes() { try { const d=JSON.parse(localStorage.getItem("cube_times")); if(Array.isArray(d)){ times.push(...d); } const o=parseInt(localStorage.getItem("cube_order")); if(o===2||o===3) cubeOrder=o; const h=localStorage.getItem("cube_hollow"); if(h==="0") hollowStickers=false; if(h==="1") hollowStickers=true; } catch(e){} }
+function addTime(ms) { times.unshift({ raw: ms, penalty: "none", scramble: currentScramble.join(" ") }); if (times.length > 200) times.length = 200; renderTimes(); updateStats(); saveTimes(); }
+function effectiveTime(t) { if (t.penalty === "dnf") return Infinity; if (t.penalty === "plus2") return t.raw + 2000; return t.raw; }
+
+function updateStats() {
+  const valid = times.filter(t => t.penalty !== "dnf").map(t => effectiveTime(t));
+  document.getElementById("s-count").textContent = times.length;
+  if (valid.length === 0) { ["s-ao5","s-ao12","s-best","s-worst","s-mean"].forEach(id => document.getElementById(id).textContent = "-"); return; }
+  const sorted = [...valid].sort((a,b)=>a-b);
+  document.getElementById("s-best").textContent = fmtTime(sorted[0]);
+  document.getElementById("s-worst").textContent = fmtTime(sorted[sorted.length-1]);
+  document.getElementById("s-mean").textContent = fmtTime(Math.round(valid.reduce((a,b)=>a+b,0)/valid.length));
+  function calcAo(n) {
+    if (valid.length < n) return "-";
+    const lastN = valid.slice(0, n), s = [...lastN].sort((a,b)=>a-b);
+    if (n === 5) return fmtTime(Math.round((s[1]+s[2]+s[3])/3));
+    if (n === 12) { const mid = s.slice(1,11); return fmtTime(Math.round(mid.reduce((a,b)=>a+b,0)/10)); }
+  }
+  document.getElementById("s-ao5").textContent = calcAo(5);
+  document.getElementById("s-ao12").textContent = calcAo(12);
+}
+
+function setPenalty(idx, penalty) { if (idx >= 0 && idx < times.length) { times[idx].penalty = times[idx].penalty === penalty ? "none" : penalty; renderTimes(); updateStats(); saveTimes(); } }
+function deleteTime(idx) { if (idx >= 0 && idx < times.length) { times.splice(idx,1); renderTimes(); updateStats(); saveTimes(); } }
+
+function renderTimes() {
+  const tbody = document.getElementById("times-body");
+  tbody.innerHTML = times.map((t, i) => {
+    const eff = effectiveTime(t); let cls = "", display = fmtTime(t.raw);
+    if (t.penalty === "dnf") { cls = "dnf"; display = "DNF (" + fmtTime(t.raw) + ")"; }
+    else if (t.penalty === "plus2") { cls = "plus2"; display = fmtTime(t.raw) + " +2 = " + fmtTime(eff); }
+    const p2active = t.penalty === "plus2" ? " act-active" : "", dnfActive = t.penalty === "dnf" ? " act-active" : "";
+    return "<tr><td class=\"t-idx\">" + (times.length-i) + "</td><td class=\"t-time " + cls + "\">" + display + "</td><td>" +
+      "<button class=\"act-btn" + p2active + "\" data-idx=\"" + i + "\" data-act=\"plus2\">+2</button>" +
+      "<button class=\"act-btn" + dnfActive + "\" data-idx=\"" + i + "\" data-act=\"dnf\">DNF</button>" +
+      "<button class=\"act-btn\" data-idx=\"" + i + "\" data-act=\"del\">X</button></td></tr>";
+  }).join("");
+  tbody.querySelectorAll(".t-time").forEach(td => {
+    td.addEventListener("click", () => {
+      const row = td.parentElement;
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains("scramble-pop")) { next.classList.toggle("show"); return; }
+      const idx = parseInt(row.querySelector("[data-act]").dataset.idx);
+      if (idx >= 0 && idx < times.length && times[idx].scramble) {
+        const pop = document.createElement("tr");
+        pop.className = "scramble-pop show";
+        pop.innerHTML = "<td></td><td colspan=\"2\">" + times[idx].scramble + "</td>";
+        row.after(pop);
+      }
+    });
+  });
+  tbody.querySelectorAll(".act-btn").forEach(btn => { btn.addEventListener("click", () => { const idx = parseInt(btn.dataset.idx), act = btn.dataset.act; if (act === "del") deleteTime(idx); else setPenalty(idx, act); }); });
+}
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  times.length = 0; renderTimes(); updateStats(); saveTimes();
+  timerEl.textContent = "0.00";
+  stateEl.textContent = virtualMode ? "转动魔方开始计时，还原结束计时" : "按住空格键 / 触摸屏幕 开始计时";
+});
+
+const cubeSizeSlider = document.getElementById("cube-size");
+const cubeSizeLabel = document.getElementById("cube-size-label");
+let cubeSizeVal = 380;
+
+function getVirtualCubeSize(){const vw=window.innerWidth;if(vw<=480)return Math.min(vw*0.9,300);if(vw<=640)return Math.min(vw*0.85,380);return 380}
+function resizeCube() {
+  const w = cubeWrap.clientWidth, h = cubeWrap.clientHeight || w;
+  pCamera.aspect = w / Math.max(h, 1);
+  pCamera.updateProjectionMatrix();
+  pRenderer.setSize(w, h);
+}
+// resize listener moved below
+
+function applyHollowMode() {
+  previewCubies.forEach(c => {
+    c.material.opacity = hollowStickers ? 0 : 1;
+    c.children.forEach(child => {
+      if (child.isLineSegments) child.visible = !hollowStickers;
+    });
+  });
+}
+
+function animate(ts) { requestAnimationFrame(animate); pControls.update(); pRenderer.render(pScene, pCamera); }
+animate(); resizeCube(); updateStats(); renderTimes();
+if (loadTimes) { loadTimes(); renderTimes(); updateStats(); }
+stateEl.textContent = virtualMode ? "转动魔方开始计时，还原结束计时" : "按住空格键 / 触摸屏幕 开始计时";
+if (virtualMode) {
+    document.getElementById("main-layout").classList.add("virtual-layout"); document.getElementById("timer-card").classList.add("virtual-timer");
+    
+    document.getElementById("ready-label").style.display = "none";
+    document.getElementById("cube-size-label").style.display = "flex"; const isz=getVirtualCubeSize(); cubeWrap.style.width=isz+"px"; cubeWrap.style.height=isz+"px"; cubeWrap.style.left="0px"; cubeWrap.style.top="0px"; resizeCube(); cubeSizeSlider.value=isz;
+  }
+
+const modeBtn = document.getElementById("mode-toggle");
+modeBtn.addEventListener("click", () => {
+  if (timerRunning) { timerRunning = false; timerEl.classList.remove("running"); }
+  cancelReady();
+  virtualMode = !virtualMode;
+  if (virtualMode) {
+    modeBtn.textContent = "虚拟魔方"; modeBtn.classList.remove("normal"); document.getElementById("main-layout").classList.add("virtual-layout"); document.getElementById("timer-card").classList.add("virtual-timer");  
+    stateEl.textContent = "转动魔方开始计时，还原结束计时";
+    pCamera.position.set(5, 5, 5); pCamera.lookAt(0, 0, 0); document.getElementById("ready-label").style.display = "none"; document.getElementById("cube-size-label").style.display = "flex"; const sz=getVirtualCubeSize();cubeWrap.style.width=sz+"px";cubeWrap.style.height=sz+"px";cubeWrap.style.left="0px";cubeWrap.style.top="0px";resizeCube();cubeSizeSlider.value=sz;cubeSizeSlider.max=Math.min(500,window.innerWidth-20); cubeWrap.style.transition = "opacity .25s"; cubeWrap.style.opacity = "0"; setTimeout(() => { currentScramble = generateScramble(); scrambleText.textContent = currentScramble.join(" "); applyScramble(currentScramble); cubeWrap.style.opacity = "1"; setTimeout(() => cubeWrap.style.transition = "", 300); }, 250);
+  } else {
+    modeBtn.textContent = "普通计时"; modeBtn.classList.add("normal"); document.getElementById("main-layout").classList.remove("virtual-layout"); document.getElementById("timer-card").classList.remove("virtual-timer");  document.getElementById("times-wrap").before(document.getElementById("stats-row"));
+    stateEl.textContent = "按住空格键 / 触摸屏幕 开始计时";
+    pControls.enabled = true; document.getElementById("ready-label").style.display = ""; animBtn.style.display = ""; cubeWrap.style.width = "100px"; cubeWrap.style.height = "100px"; cubeWrap.style.left = "0px"; cubeWrap.style.top = "0px"; resizeCube(); document.getElementById("cube-size-label").style.display = "none"; cubeWrap.style.transition = "opacity .25s"; cubeWrap.style.opacity = "0"; setTimeout(() => { currentScramble = generateScramble(); scrambleText.textContent = currentScramble.join(" "); applyScramble(currentScramble); cubeWrap.style.opacity = "1"; setTimeout(() => cubeWrap.style.transition = "", 300); }, 250);
+  }
+  timerEl.classList.remove("ready", "running");
+});
+
+// Cube type toggle: 二阶 / 三阶
+const cubeTypeBtn = document.getElementById("cube-type-btn");
+cubeTypeBtn.addEventListener("click", () => {
+  if (cubeOrder === 3) {
+    cubeOrder = 2;
+    cubeTypeBtn.textContent = "二阶";
+    cubeTypeBtn.classList.add("c2");
+    cubeTypeBtn.classList.remove("c3");
+  } else {
+    cubeOrder = 3;
+    cubeTypeBtn.textContent = "三阶";
+    cubeTypeBtn.classList.add("c3");
+    cubeTypeBtn.classList.remove("c2");
+  }
+  times.length = 0; renderTimes(); updateStats(); saveTimes();
+  timerEl.textContent = "0.00";
+  cubeWrap.style.transition = "opacity .25s";
+  cubeWrap.style.opacity = "0";
+  setTimeout(() => {
+    showSolved = false; btnSolved.textContent = "显示还原";
+    currentScramble = generateScramble();
+    scrambleText.textContent = currentScramble.join(" ");
+    applyScramble(currentScramble);
+    cubeWrap.style.opacity = "1";
+    setTimeout(() => cubeWrap.style.transition = "", 300);
+  }, 250);
+  timerEl.classList.remove("ready", "running");
+  stateEl.textContent = virtualMode ? "转动魔方开始计时，还原结束计时" : "按住空格键 / 触摸屏幕 开始计时";
+});
+
+function updateCubeTypeUI() {
+  if (cubeOrder === 2) {
+    cubeTypeBtn.textContent = "二阶";
+    cubeTypeBtn.classList.add("c2"); cubeTypeBtn.classList.remove("c3");
+  } else {
+    cubeTypeBtn.textContent = "三阶";
+    cubeTypeBtn.classList.add("c3"); cubeTypeBtn.classList.remove("c2");
+  }
+}
+updateCubeTypeUI();
+
+const animBtn = document.getElementById("anim-scramble");
+animBtn.addEventListener("click", () => {
+  scrambleAnim = !scrambleAnim;
+  animBtn.textContent = "打乱动画: " + (scrambleAnim ? "开" : "关");
+  if (scrambleAnim) animBtn.classList.add("accent"); else animBtn.classList.remove("accent");
+});
+
+const hollowBtn = document.getElementById("hollow-btn");
+hollowBtn.addEventListener("click", () => {
+  hollowStickers = !hollowStickers;
+  hollowBtn.textContent = "贴纸: " + (hollowStickers ? "镂空" : "实心");
+  if (hollowStickers) hollowBtn.classList.add("accent"); else hollowBtn.classList.remove("accent");
+  try { localStorage.setItem("cube_hollow", hollowStickers?"1":"0"); } catch(e){}
+  if (showSolved) { buildPreviewCubies(); if (virtualMode) saveOriginalState(); }
+  else { buildPreviewCubies(); applyScramble(currentScramble); }
+});
+
+cubeSizeSlider.addEventListener("input", () => {
+  cubeSizeVal = parseInt(cubeSizeSlider.value);
+  cubeWrap.style.width = cubeSizeVal + "px";
+  cubeWrap.style.height = cubeSizeVal + "px";
+  cubeSizeSlider.value = cubeSizeVal;
+  resizeCube();
+});
+
+// Drag handle + resize
+const dragHandle = document.createElement("div");
+dragHandle.id = "drag-handle";
+dragHandle.innerHTML = "⋮⋮";
+cubeWrap.appendChild(dragHandle);
+
+const resizeHandle = document.createElement("div");
+resizeHandle.id = "resize-handle";
+resizeHandle.innerHTML = "◢";
+cubeWrap.appendChild(resizeHandle);
+
+let dOn = false, rOn = false, dmx = 0, dmy = 0, dlx = 0, dly = 0, did = null;
+let rw = 0, rh = 0;
+
+window.addEventListener("resize",()=>{resizeCube();if(virtualMode){const sz=getVirtualCubeSize();cubeSizeSlider.max=Math.min(500,window.innerWidth-20);if(!dOn&&!rOn){cubeWrap.style.width=sz+"px";cubeWrap.style.height=sz+"px";cubeSizeSlider.value=sz}}});
+
+dragHandle.addEventListener("pointerdown", e => {
+  if (!virtualMode) return;
+  e.stopPropagation(); did = e.pointerId; dOn = true; pControls.enabled = false;
+  dmx = e.clientX; dmy = e.clientY;
+  dlx = parseInt(cubeWrap.style.left)||0; dly = parseInt(cubeWrap.style.top)||0;
+  cubeWrap.style.zIndex = "100";
+  cubeWrap.style.boxShadow = "0 0 40px rgba(0,212,255,0.5), 0 0 80px rgba(120,40,240,0.3), inset 0 1px 0 rgba(255,255,255,0.06)";
+  dragHandle.setPointerCapture(e.pointerId);
+});
+dragHandle.addEventListener("pointermove", e => {
+  if (!dOn || e.pointerId !== did) return;
+  const nx = dlx + e.clientX - dmx, ny = dly + e.clientY - dmy;
+  cubeWrap.style.left = nx + "px";
+  cubeWrap.style.top = ny + "px";
+});
+dragHandle.addEventListener("pointerup", () => { dOn = false; did = null; pControls.enabled = true; cubeWrap.style.zIndex = ""; cubeWrap.style.boxShadow = ""; });
+dragHandle.addEventListener("pointercancel", () => { dOn = false; did = null; pControls.enabled = true; cubeWrap.style.zIndex = ""; cubeWrap.style.boxShadow = ""; });
+
+resizeHandle.addEventListener("pointerdown", e => {
+  if (!virtualMode) return;
+  e.stopPropagation(); rOn = true; pControls.enabled = false;
+  rw = cubeWrap.clientWidth; rh = cubeWrap.clientHeight;
+  dmx = e.clientX; dmy = e.clientY;
+  resizeHandle.setPointerCapture(e.pointerId);
+});
+resizeHandle.addEventListener("pointermove", e => {
+  if (!rOn) return;
+  const maxSz=Math.min(600,window.innerWidth-20);const nw=Math.max(120,Math.min(maxSz,rw+e.clientX-dmx));const nh=Math.max(120,Math.min(maxSz,rh+e.clientY-dmy));
+  cubeWrap.style.width = nw + "px"; cubeWrap.style.height = nh + "px";
+  cubeSizeSlider.value = Math.round((nw + nh) / 2);
+  resizeCube();
+});
+resizeHandle.addEventListener("pointerup", () => { rOn = false; pControls.enabled = true; });
+resizeHandle.addEventListener("pointercancel", () => { rOn = false; pControls.enabled = true; });
+const btnFullscreen = document.getElementById("btn-fullscreen");
+btnFullscreen.addEventListener("click", () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+    btnFullscreen.textContent = "[  ] 退出";
+  } else {
+    document.exitFullscreen();
+    btnFullscreen.textContent = "[  ] 全屏";
+  }
+});
+
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement) btnFullscreen.textContent = "[  ] 全屏";
+});
+
+// Startup splash
+(function(){
+  const splash = document.getElementById("splash");
+  setTimeout(() => splash.classList.add("hide"), 1400);
+  setTimeout(() => splash.remove(), 2100);
+})();
+
+
+// ——— Starfield ———
+(function(){
+  const cv=document.getElementById("stars-canvas"),ctx=cv.getContext("2d");
+  let stars=[],w,h;
+  function resize(){w=cv.width=window.innerWidth;h=cv.height=window.innerHeight}
+  resize();window.addEventListener("resize",resize);
+  for(let i=0;i<200;i++)stars.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.6+0.3,a:Math.random(),s:Math.random()*0.01+0.003,d:Math.random()<0.5});
+  function draw(t){
+    ctx.clearRect(0,0,w,h);
+    stars.forEach(s=>{
+      let alpha=s.a+Math.sin(t*s.s+s.d*10)*0.3;
+      alpha=Math.max(0.15,Math.min(1,alpha));
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(200,220,255,'+alpha+')';ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+console.log("Cube Timer ready");
+</script>
+<script>if(location.protocol.startsWith("http")&&"serviceWorker"in navigator)navigator.serviceWorker.register("sw.js");</script>
+</body>
+</html>
+
